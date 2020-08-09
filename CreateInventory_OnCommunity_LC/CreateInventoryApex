@@ -1,0 +1,97 @@
+public class CreateInventoryApex {
+    
+    @AuraEnabled
+    public static string getUser(){
+        User u= [Select Id, name, ContactId, contact.Email from User where Id=: UserInfo.getUserId() AND ContactId!= null AND IsActive=True];
+        return u.ContactId;
+    }
+    
+    @AuraEnabled
+    public static string createinventories(String orderid){
+        try{
+            Set<String> ProductCode = new Set<String>();
+            Set<String> ProductName =  new Set<String>();
+            String message='';
+            List<Inventory__c> invenlist = new List<Inventory__c>();
+            List<OrderItem> InventoryList =[SELECT Id, Quantity,Order.name, Product2Id,Product2.ProductCode,Product2.name FROM OrderItem WHERE OrderId=: orderid];
+            Order o= [SELECT Id, Status, AccountId FROM Order WHERE Id=: orderid];
+            Map<String,Inventory__c> InventoryMap = new Map<String,Inventory__c>();
+            if(InventoryList.size()>0){
+                for(OrderItem ord: InventoryList){
+                    if(ord.Product2.name!=null){
+                        ProductName.add(ord.Product2.name);
+                    }
+                    if(ord.Product2.ProductCode!=null){
+                        ProductCode.add(ord.Product2.ProductCode);
+                    }
+                    
+                }
+            }
+            if(o.Status!='Delivered'){
+                message='Your Order Is Not Yet Delivered';
+            }else{
+                if(!ProductName.isEmpty() && !ProductCode.isEmpty()){ 
+                    List<Inventory__c> inventorieslist = new List<Inventory__c>();
+                    
+                    for(Inventory__c inv: [SELECT Id, Name,Quantity__c, Product_Name__c, Product_Code__c 
+                                           FROM Inventory__c 
+                                           WHERE Product_Name__c IN: ProductName AND Product_Code__c IN: ProductCode]){
+                                               String key = inv.Product_Name__c+''+inv.Product_Code__c; 
+                                               InventoryMap.put(key,inv);
+                                           } 
+                    
+                    for(OrderItem ord: InventoryList){
+                        Inventory__c inven = new Inventory__c();
+                        String key = ord.Product2.name+''+ord.Product2.ProductCode; 
+                        if(InventoryMap.containsKey(key)){
+                            inven.Id = InventoryMap.get(key).Id;
+                            inven.Quantity__c = InventoryMap.get(key).Quantity__c + ord.Quantity; 
+                        }else{
+                            inven.Quantity__c = ord.Quantity;  
+                        }
+                        inven.Product_Name__c = ord.Product2.name;
+                        inven.Product_Code__c=ord.Product2.ProductCode;
+                        inven.Account__c=o.AccountId;
+                        inventorieslist.add(inven);
+                    }
+                    if(!inventorieslist.isEmpty()){
+                        Upsert inventorieslist;
+                    }
+                    
+                    List<String> errorMessages = new List<String>();
+                    List<Messaging.SingleEmailMessage> mailList = new List<Messaging.SingleEmailMessage>();
+                    List<String> sendTo = new List<String>();
+                    Set<String> contactIdset = new Set<String>();
+                    Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+                    String name='';
+                    Contact con = [SELECT Id, Name, Email, AccountId, Account.Owner.Email, Account.Owner.Manager.Name FROM Contact WHERE Id=: getUser()];
+                    if(con.Email!=null){
+                        sendTo.add(con.Email);
+                    }
+                    if(con.Name!=null){
+                        name=con.Name;
+                    }
+                    mail.setToAddresses(sendTo);
+                    mail.setSubject('Your Order Is Accepted');
+                    String body = 'Dear '+ name + ', <br><br>';
+                    body += 'Your Order Is Accepted';
+                    mail.setHtmlBody(body);
+                    mailList.add(mail);
+                    if(!mailList.isEmpty()) {
+                        try{
+                            Messaging.sendEmail(mailList);
+                        }catch (Exception ex) {
+                            errorMessages.add('Unable To Send Email To Tech: '+ ex.getStackTraceString());
+                        }
+                    }
+                    
+                }
+                message='Your Order Is Accepted';
+            }
+            return message;
+        }catch(exception e){
+            
+        }
+        return null;
+    }
+}
