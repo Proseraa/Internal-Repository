@@ -1,0 +1,11 @@
+.THIS .customCls{
+    margin-top: -10px;
+    width: 213px;
+    position: relative;
+    left: -2px;
+    right: -689px;
+}
+.THIS.slds-spinner_container {  
+  z-index: 10000;
+  position: fixed;   
+}

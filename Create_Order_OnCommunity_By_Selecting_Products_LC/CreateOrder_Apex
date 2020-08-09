@@ -1,0 +1,229 @@
+public without sharing class CreateOrderApex {
+    
+    @AuraEnabled
+    public static string getUser(){
+        User u= [Select Id, name, email, ContactId,Contact.AccountId from User where Id=: UserInfo.getUserId() AND ContactId!= null AND IsActive=True];
+        return u.contact.AccountId;
+    }
+    
+    public static string getPriceBook(){
+        Pricebook2 pb2 = [select Id, Name,CurrencyIsoCode, IsActive from PriceBook2 where IsStandard=True LIMIT 1];
+        return pb2.id;
+    }
+    
+    @AuraEnabled 
+    public static Map<String, String> getStatus(){
+        Map<String, String> options = new Map<String, String>();
+        Schema.DescribeFieldResult fieldResult = Order.Status.getDescribe();
+        List<Schema.PicklistEntry> pList = fieldResult.getPicklistValues();
+        for (Schema.PicklistEntry p: pList) {
+            options.put(p.getValue(), p.getLabel());
+        }
+        return options;
+    } 
+    
+    @AuraEnabled 
+    public static Map<String, String> getCurrency(){
+        Map<String, String> options = new Map<String, String>();
+        Schema.DescribeFieldResult fieldResult = Order.CurrencyIsoCode.getDescribe();
+        List<Schema.PicklistEntry> pList = fieldResult.getPicklistvalues();
+        for (Schema.PicklistEntry p: pList) {
+            options.put(p.getValue(), p.getLabel());
+        }
+        return options;
+    } 
+    
+    @AuraEnabled
+    public static List<String> getPicklistvalues(String objectName, String field_apiname,Boolean nullRequired){
+        List<String> optionlist = new List<String>();       
+        Map<String,Schema.SObjectType> gd = Schema.getGlobalDescribe(); 
+        Map<String, Schema.SObjectField> field_map = gd.get(objectName.toLowerCase()).getDescribe().fields.getMap();        
+        List<Schema.PicklistEntry> picklistValues = field_map.get(field_apiname).getDescribe().getPickListValues();       
+        if(nullRequired == true){
+            optionlist.add('--None--');
+        }       
+        for (Schema.PicklistEntry pv : picklistValues) {
+            optionlist.add(pv.getValue());
+        }
+        return optionlist;
+    }
+    
+    @AuraEnabled
+    public static Account getAccountId(){
+        Set<Id> acIdSet = new Set<Id>(); 
+        Set<Id> contactEmailSet = new Set<Id>(); 
+        try{
+            Account a = [SELECT Id, Name FROM Account WHERE Id =:getUser()];
+            return a;
+        }catch(exception e){
+            
+        }
+        return null;
+    }
+    
+    @AuraEnabled
+    public static list<PricebookEntry> getListOfProducts(){
+        Pricebook2 pb2 = [select Id, Name,CurrencyIsoCode, IsActive from PriceBook2 where IsStandard=True LIMIT 1];
+        List<PricebookEntry> productList =[Select Id,Product2Id,Product2.Name, ProductCode, IsActive, Pricebook2Id,
+                                           UnitPrice, Product2.Family, UseStandardPrice,CurrencyIsoCode,Product2.Quantity__c
+                                           from PricebookEntry where IsActive = True AND Pricebook2Id=: getPriceBook()
+                                           AND CurrencyIsoCode ='INR' AND Product2.Quantity__c !=null];
+        return productList;    
+    }
+    
+    @AuraEnabled
+    public static list<OrderItemListWrapper> getorderItemProducts(List<PricebookEntry> selproductList){
+        List<OrderItemListWrapper> orderitemList =new List<OrderItemListWrapper>();
+        for(PricebookEntry pr:selproductList){
+            OrderItemListWrapper oli = new OrderItemListWrapper();
+            oli.productId = pr.Product2Id; 
+            oli.productName =  pr.Product2.Name;
+            oli.ListPrice = pr.UnitPrice;
+            oli.UnitPrice = pr.UnitPrice;
+            oli.Quantity=0;
+            oli.prcEntryId =pr.id;
+            oli.prc2Id=pr.Product2Id;
+            oli.CurrencyCode=pr.CurrencyIsoCode;
+            orderitemList.add(oli);
+        } 
+        return orderitemList;    
+    }  
+    
+    @AuraEnabled
+    public static string SaveOrder(Order objord, String acId){
+        try{
+            Pricebook2 pb2 = [select Id, Name,CurrencyIsoCode, IsActive from PriceBook2 where IsStandard=True LIMIT 1];
+            
+            Order orderobj= new Order();
+            orderobj = objord; 
+            if(acId!= null){
+                orderobj.AccountId= acId;                
+            }  
+            if(pb2.id!= null){
+                orderobj.Pricebook2Id=getPriceBook(); 
+            }
+            insert orderobj;
+            return orderobj.Id;
+        }catch(Exception e){
+            return 'Order Creation Failed Or Please Select Order Status Is Placed';
+        }  
+    }
+    
+    @AuraEnabled
+    public static string insertorderitems(string orderid,List<OrderItemListWrapper> orderItemList){
+        String message='';
+        String Error='';
+        try{
+            List<String> errorMessages = new List<String>();
+            List<Messaging.SingleEmailMessage> mailList = new List<Messaging.SingleEmailMessage>();
+            List<OrderItem> olist=new List<OrderItem>();  
+            for(OrderItemListWrapper oliwrap:orderItemList){
+                OrderItem oli = new OrderItem();
+                oli.Product2Id = oliwrap.productId;
+                if(oliwrap.Quantity!= null && oliwrap.Quantity!= 0){
+                    oli.Quantity= oliwrap.Quantity;
+                }else {
+                    Error = 'Quantity Should not be null/0';
+                }
+                if(oliwrap.UnitPrice!= null){
+                    oli.UnitPrice=oliwrap.UnitPrice;
+                }else{
+                    Error = 'UnitPrice Should not be null'; 
+                }
+                oli.PriceBookEntryId = oliwrap.prcEntryId;
+                oli.OrderId = orderid; 
+                olist.add(oli);
+            }
+            
+            if(olist.size()>0){
+                if(Error.contains('Quantity Should not be null/0')){
+                    message='Quantity Should Not Be Null/0';
+                }else if(Error.contains('UnitPrice Should not be null')){
+                    message='UnitPrice Should Not Be Null';
+                }else{
+                    insert olist;  
+                    message='Saved Successfully';
+                    List<String> sendTo = new List<String>();
+                    String name='';
+                    Account ac= [SELECT Id, Name, Owner.Email, Owner.Name FROM Account WHERE Id =:getUser()];
+                    if(ac.Owner.Email!=null){
+                        sendTo.add(ac.Owner.Email);
+                    }
+                    if(ac.Owner.Name!=null){
+                        name=ac.Owner.Name;
+                    }
+                    Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
+                    sendTo.add('krishna.reddy@proseraa.com');
+                    mail.setToAddresses(sendTo);
+                    mail.setSubject('Your Order Is Placed');
+                    String body = 'Dear '+ name + ', <br><br>';
+                    body += 'Your Order Is Placed';
+                    mail.setHtmlBody(body);
+                    mailList.add(mail);
+                    
+                }
+            }
+            if(!mailList.isEmpty()) {
+                try{
+                    //Messaging.sendEmail(mailList);
+                }catch (Exception ex) {
+                    errorMessages.add('Unable To Send Email To Tech: '+ ex.getStackTraceString());
+                }
+            }
+            return message;
+        }catch(Exception e){
+            message=e.getMessage();
+            return message;
+        }
+        
+    }
+    
+    @AuraEnabled
+    public static void deleteorder(string orderid){
+        Order o= [SELECT Id FROM Order WHERE Id=: orderid];
+        Delete o;
+    }
+    
+    // wrapper class with @AuraEnabled and {get;set;} properties 
+    public class OrderItemListWrapper{
+        @AuraEnabled
+        public String productName{get;set;}
+        @AuraEnabled
+        public String productId{get;set;}
+        @AuraEnabled
+        public Integer Quantity{get;set;}
+        @AuraEnabled
+        public Decimal UnitPrice{get;set;}
+        @AuraEnabled
+        public Decimal ListPrice{get;set;}
+        @AuraEnabled
+        public Id prcEntryId{get;set;}
+        @AuraEnabled
+        public Id prc2Id{get;set;}
+        @AuraEnabled
+        public string CurrencyCode{get;set;}
+    }   
+    
+    /*wrapper class to store listViewWrapper details*/ 
+    @AuraEnabled
+    public static list<listViewWrapper> listValues(string objectInfo){
+        
+        list<listViewWrapper> oListViewWrapper = new list<listViewWrapper>();
+        
+        for(ListView lv : [SELECT id, Name, DeveloperName FROM ListView WHERE sObjectType = : objectInfo ORDER By Name ASC])
+        { 
+            listViewWrapper oWrapper = new listViewWrapper();
+            oWrapper.label = lv.Name;
+            oWrapper.developerName = lv.DeveloperName;
+            oListViewWrapper.add(oWrapper);
+        }
+        
+        return oListViewWrapper; 
+    }
+    
+    /*wrapper class to store listView details*/ 
+    public class listViewWrapper{
+        @AuraEnabled public string label{get;set;} 
+        @AuraEnabled public string developerName{get;set;} 
+    }
+}
