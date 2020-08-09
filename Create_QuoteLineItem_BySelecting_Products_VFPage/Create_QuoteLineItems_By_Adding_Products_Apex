@@ -1,0 +1,158 @@
+global class ProductSearchPopupController {
+    
+    public String query {get; set;}
+    public List<wrapProduct> wrapProductList {get; set;}
+    public List<QuoteLineitem__c> selectedProduct{get;set;}
+    public List<wrapProduct> selectedWrapperList{get;set;}
+    public Boolean normalList{get;set;}
+    public Boolean selectedList{get;set;}
+    public Boolean block{get;set;}
+    public Boolean block1{get;set;}
+    public Boolean block2{get;set;}
+    public Boolean Error{get;set;}
+    public String SalesPrice {get; set;}
+    public integer Discount {get; set;}
+    public String Quantity {get; set;}
+    public String ServiceDate {get; set;}
+    public list<PricebookEntry__c> PricebookEntryList{get;set;}
+    public string selectePriceBook{get;set;}
+    public list<selectOption> listofpricebook{get;set;}
+    
+    Id recordId;
+    
+    public ProductSearchPopupController(ApexPages.StandardController controller){
+        recordId = controller.getId();
+        SalesPrice='';
+        Quantity='';
+        ServiceDate='';
+        wrapProductList = new List<wrapProduct>();
+        selectedWrapperList = new List<wrapProduct>();
+        normalList = true;
+        selectedList = true;
+        block = true;
+        block1 = true;
+        block2 = false;
+        selectePriceBook='None';
+        Error=False;
+        listofpricebook=new list<selectOption>();
+        PricebookEntryList= new List<PricebookEntry__c>();
+        
+        list<pricebook2__c> przblist=new list<pricebook2__c>([select id, name, Is_Standard_Price_Book__c, IsActive__c from pricebook2__c Where IsActive__c =True Limit 999]);
+        listofpricebook.clear();
+        listofpricebook.add(new SelectOption('None','--None--'));
+        for(pricebook2__c pb: przblist)
+        {
+            listofpricebook.add(new selectOption(pb.id,pb.name));
+        }
+        
+    }
+    public PageReference runQuery1(){
+        
+        List<PricebookEntry__c> searchResults=[select id, PricebookEntry__c.Name, Pricebook2Id__r.Id, Pricebook2Id__r.Name, Product2Id__r.Product_Code__c, Product2Id__r.Name, ProductCode__c, 
+                                               Product2Id__r.Product_Description__c,UnitPrice__c, UseStandardPrice__c, Product2Id__r.IsActive__c
+                                               from PricebookEntry__c where IsActive__c = true And Pricebook2Id__c=:selectePriceBook AND Product2Id__r.Name!=null AND Product2Id__r.IsActive__c = true];
+        if(searchResults.size() >= 0){
+            
+            for(PricebookEntry__c a: searchResults) {
+                // As each product is processed we create a new wrapproduct object and add it to the wrapProductList
+                wrapProductList.add(new wrapProduct(a));
+                block = true;
+                block1 = true;
+                block2 = false;
+            }
+        }
+        return null;
+    }
+    public PageReference runQuery(){
+        wrapProductList = new List<wrapProduct>();
+        
+        if(query == null || query == '' || query.length() ==1){
+            runQuery1();
+        }else if(query.length() >1){
+            query = '%'+query+'%'; 
+            List<PricebookEntry__c> searchResults=[Select id, Name, Product_Name__c, Product2Id__c, Pricebook2Id__r.Id, 
+                                                   Pricebook2Id__r.Name, Product2Id__r.Name, Product2Id__r.Product_Code__c,
+                                                   Product2Id__r.Product_Description__c,UnitPrice__c, UseStandardPrice__c 
+                                                   from PricebookEntry__c where (Product2Id__r.Name like:query OR Product2Id__r.Product_Code__c like:query)
+                                                   And Pricebook2Id__c=:selectePriceBook Limit 1];
+            
+            if(searchResults.size()>0){ 
+                // As each Account is processed we create a new wrapAccount object and add it to the wrapAccountList
+                wrapProductList.add(new wrapProduct(searchResults[0]));
+                block = true;
+                block1 = true;  
+                block2 = false;  
+                
+            }
+            query = query.replaceAll('%','');
+        }
+        return null;
+    }
+    public void processSelected() {
+        selectedProduct = new List<QuoteLineitem__c>();
+        for(wrapProduct wrapProductObj : wrapProductList) {
+            if(wrapProductObj.selected == true) {
+                QuoteLineitem__c qli = new QuoteLineitem__c(); 
+                qli.QuotesId__c = recordId;
+                qli.ListPrice__c = wrapProductObj.acc.UnitPrice__c;
+                qli.UnitPrice__c = wrapProductObj.acc.UnitPrice__c;
+                qli.Product2Id__c = wrapProductObj.acc.Product2Id__c; 
+                qli.Quantity__c = 1;
+                selectedProduct.add(qli);
+                block = true;
+                block1 = false;
+                block2 = true;
+            }else{
+                Error=True;
+            }
+        }
+        if(Error==True && selectedProduct.isEmpty()){
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Please select at least one product to continue'));
+        }
+        
+    }
+    public void callOnPageLoad() {
+        runQuery1();
+        processSelected();
+    }
+    
+    public void GoBack() {
+        block = true;
+        block1 = true;
+        block2 = false;
+    }
+    
+    global class wrapProduct{
+        public PricebookEntry__c acc {get;set;}
+        public Boolean selected {get;set;}
+        public wrapProduct(PricebookEntry__c p) {
+            this.acc = p;
+            this.selected = false;
+        } 
+    }
+    
+    public pagereference saveproduct(){
+        
+        if(!selectedProduct.isEmpty()){
+            for(QuoteLineitem__c sp:selectedProduct){
+                if(sp.Quantity__c == null || sp.Quantity__c==0){
+                    ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Quantity should not be blank or Zero'));   
+                    return null;
+                }
+            }
+            
+            if(selectedProduct.size() > 0){
+                try{
+                    insert selectedProduct;
+                }Catch(Exception e){
+                    ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, 'Discount length Should not be greaterthan 3 and Before the Decimal Point also'));
+                    return null;
+                } 
+                PageReference pageRef = new PageReference('/'+recordId);
+                pageRef.setRedirect(true);
+                return pageRef;
+            }
+        }
+        return null;
+    }
+}

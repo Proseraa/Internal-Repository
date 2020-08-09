@@ -1,0 +1,97 @@
+<apex:page showHeader="false" cache="true" sidebar="false" standardController="Quotes__c" docType="html-5.0" action="{!callOnPageLoad}" extensions="ProductSearchPopupController" lightningStylesheets="true">
+    <style type="text/css">
+        .outBorder
+        {
+        border:1px outset white;
+        }
+    </style>
+    <apex:form >
+        <apex:outputPanel id="errorMessage">
+            <apex:pageMessages /> 
+        </apex:outputPanel> 
+        <apex:actionFunction name="onchangePriceBook" action="{!runQuery}" reRender="rendersec,errorMessage"/>  
+        <apex:outputPanel id="rendersec">
+            <apex:pageBlock >
+                <apex:pageBlockSection columns="2" title="Select The Price Book">
+                    <apex:selectList value="{!selectePriceBook}" size="1" onchange="onchangePriceBook()"> 
+                        <apex:selectOptions value="{!listofpricebook}"> 
+                        </apex:selectOptions>
+                    </apex:selectList>
+                    <apex:outputPanel rendered="{!IF(selectePriceBook== 'None', false , true)}">
+                        <apex:pageBlockSectionItem >
+                            <apex:outputLabel style="font-weight:bold;">Search By Product</apex:outputLabel>
+                            <apex:inputText value="{!query}" id="query" style="width:150px; height:35px;" label="Search Product"/> 
+                        </apex:pageBlockSectionItem>
+                        <apex:commandButton value="Go" action="{!runQuery}" style="align: right:100px;border-style:solid;
+                                                                                   color:white; position:relative;background-color:rgba(13, 112, 165, 1);" rerender="rendersec,errorMessage"/>
+                        <apex:commandButton value="Cancel" action="{!cancel}" style="float: centre:200px ;border-style:solid;
+                                                                                     color:rgb(21, 137, 238); background-color:white;" />
+                        
+                    </apex:outputPanel>
+                </apex:pageBlockSection> 
+            </apex:pageBlock> 
+            
+            <apex:outputPanel rendered="{!IF(selectePriceBook== 'None', false , true)}"> 
+                <apex:pageBlock id="renderblock1" rendered="{!block1}" title="Product Details" >
+                    <div align="Center">
+                        <apex:dataTable value="{!wrapProductList}" var="accWrap" width="90%" styleClass="outBorder" columns="5">
+                            <apex:column style="width:10px;"> 
+                                <apex:facet name="header">
+                                    <apex:inputCheckbox onclick="selectAllCheckboxes(this,'inputId')"/>
+                                </apex:facet>
+                                <apex:inputCheckbox value="{!accWrap.selected}" id="inputId"/>
+                            </apex:column>
+                            <apex:column headerValue="Product Name" style="width:60px;">
+                                <apex:outputLink value="/{!accWrap.acc.Product2Id__c}" >{!accWrap.acc.Product2Id__r.Name}</apex:outputLink>       
+                            </apex:column>
+                            <apex:column headerValue="ProductCode" style="width:40px;">
+                                <apex:outputText value="{!accWrap.acc.Product2Id__r.Product_Code__c}"  />       
+                            </apex:column>
+                            <apex:column headerValue="Product Description" style="width:20px;">
+                                <apex:outputText value="{!accWrap.acc.Product2Id__r.Product_Description__c}"  />       
+                            </apex:column>
+                            <apex:column headerValue="List Price" style="width:20px;">
+                                <apex:outputText value="{!accWrap.acc.UnitPrice__c}"  />  
+                            </apex:column>
+                        </apex:dataTable>  
+                        <apex:commandButton value="Next" reRender="rendersec,errorMessage" action="{!processSelected}" style="float: right;border-style:solid;
+                                                                                                                              color:white; background-color:rgba(13, 112, 165, 1);align-items: right;justify-content:right;"/>  
+                    </div>
+                </apex:pageBlock>
+                
+                <apex:pageBlock id="renderblock2" rendered="{!block2}" title="All Products"  >
+                    <div align="Center">
+                        <apex:dataTable value="{!selectedProduct}" var="c"  title="Selected Products" styleClass="outBorder" width="80%"  columns="5"> 
+                            <apex:column value="{!c.Product2Id__c}" headerValue="Product" />
+                            <apex:column headerValue="List Price">
+                                <apex:OutputText value="{!c.UnitPrice__c}" id="ListPrice"/> 
+                            </apex:column>
+                            <apex:column headerValue="Sales Price" style="width:50px;">
+                                <apex:inputText value="{!c.UnitPrice__c}" id="UnitPrice"/> 
+                            </apex:column>
+                            <apex:column headerValue="Quantity" style="width:60px;">
+                                <apex:inputText value="{!c.Quantity__c}" id="quantity"/> 
+                            </apex:column>
+                            <apex:column headerValue="Discount" style="width:60px;">
+                                <apex:inputText value="{!c.Discount__c}" id="discount" /> 
+                            </apex:column>
+                            
+                        </apex:dataTable>
+                        
+                    </div>
+                    
+                    <apex:commandButton action="{!GoBack}" reRender="rendersec" value="Back" style="border-style:solid;
+                                                                                                    color:white; background-color:rgba(13, 112, 165, 1);"/>
+                    <apex:commandButton action="{!saveproduct}" value="Save" style="float: right;border-style:solid;
+                                                                                    color:white; background-color:rgba(13, 112, 165, 1);" rerender="errorMessage"/>
+                    <apex:commandButton value="Cancel"  action="{!cancel}" style="float: right;border-style:solid;
+                                                                                  color:rgb(21, 137, 238); background-color:white;"/>           
+                </apex:pageBlock>  
+            </apex:outputPanel>
+        </apex:outputPanel>
+        <style>  
+            .requiredInput .requiredBlock::before { display: block; content: "*"; font-size: 1.5em; font-weight: bold; color: #c00; margin-left: -4px; margin-top: -2px; }  
+        </style>
+        
+    </apex:form>
+</apex:page>
