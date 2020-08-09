@@ -1,0 +1,124 @@
+public class QuoteApexClass {
+    
+    public Id testId {get;set;}
+    private Quotes__c quoteObj {get;set;}
+    public String renderAs {get; set;}
+    public String selectedList {get;set;}
+    public static final string Plain_Text_Body='As Discussed over the phone.Please find the quotation attached.Also sign the document and send us back.';
+    public static final string Subject='Email has been sent with subject name as Quote template';
+    public static final string Along_With_Attachment='along with an attachment';
+    public static final string Status_String='completed';
+    public static final string Dot_PDF='.pdf';
+    public static final string Letter='Letter - ';
+    public static final string Content_Type='application/pdf'; 
+    public static final string None='None';
+    public static final string Standard='Standard';
+    public static final string Custom='Custom';
+    
+    public QuoteApexClass(ApexPages.standardController controller){
+        if(controller.getId()!=NULL){
+            testId = controller.getId();
+            selectedList = apexpages.currentpage().getparameters().get('selval');
+            quoteObj =  [select id,OwnerId__r.Name, Name,Email__c,ContactId__c from Quotes__c where id =:testId];
+        }
+    }
+    public PageReference saveQuoteAsPDFandEmail()
+    {    
+        PageReference pr = Page.QuoteTemplate;
+        Attachment attachmnt = new Attachment();
+        Blob pdfBlob;
+        try {
+            pdfBlob = pr.getContentAsPDF();
+        }
+        catch (VisualforceException e) {
+            pdfBlob = Blob.valueOf('Some Text');
+        }
+        
+        attachmnt.parentId = testId;
+        attachmnt.Name = 'V - '+ system.Now() + Dot_PDF;
+        attachmnt.body = pdfBlob;
+        insert attachmnt;
+        
+        
+        Messaging.SingleEmailMessage semail = new Messaging.SingleEmailMessage();
+        Messaging.EmailFileAttachment attach = new Messaging.EmailFileAttachment();
+        
+        attach.setFileName(attachmnt.Name);
+        attach.setBody(attachmnt.body);
+        attach.setContentType(Content_Type);
+        semail.setSubject('Quote template '+quoteObj.Name);
+        List <String> listEmailMembers = new List<String>();
+        listEmailMembers.add(UserInfo.getUserEmail());
+        semail.setToAddresses(listEmailMembers);
+        semail.saveAsActivity = true;
+        semail.setPlainTextBody(Plain_Text_Body);
+        semail.setFileAttachments(new Messaging.EmailFileAttachment[] { attach });
+        Messaging.SendEmailResult [] r1 = Messaging.sendEmail(new messaging.SingleEmailMessage[] {semail});
+        
+        Task tk = new Task();
+        tk.ActivityDate = system.today();
+        tk.Subject = Subject +' '+ '"'+quoteObj.Name+'"';
+        tk.Description =Subject +' '+'"'+quoteObj.Name +'"'+' '+Along_With_Attachment+' '+'"'+attachmnt.Name+'"'+' '+'at'+system.now();
+        tk.Status = Status_String;
+        tk.WhatId = testId;
+        insert tk;
+        
+        attachment att = new attachment();
+        att.Name = 'V - '+ system.Now() + Dot_PDF;
+        att.body = pdfBlob;
+        att.ParentId = tk.Id;
+        insert att;
+        
+        PageReference pageRef = new PageReference('/'+testId);
+        pageRef.setRedirect(true);
+        return pageRef;  
+    }
+    
+    public Boolean getShowPrintLink() {
+        return ( (renderAs == null) || ( ! renderAs.startsWith('PDF')) );
+    }
+    
+    public PageReference print() {
+        renderAs = 'PDF';
+        PageReference pdfPage = Page.QuoteTemplate;
+        Attachment attach = new Attachment();
+        Blob pdfBlob;
+        try {
+            pdfBlob = pdfPage.getContentAsPDF();
+        }
+        catch (VisualforceException e) {
+            pdfBlob = Blob.valueOf('Some Text');
+        } 
+        
+        attach.parentId = testId;
+        attach.Name = 'V - '+ system.Now() + Dot_PDF;
+        attach.body = pdfBlob;
+        insert attach;
+        
+        PageReference pageRef = new PageReference('/'+testId);
+        pageRef.setRedirect(true);
+        return pageRef;  
+    }
+    
+    public List<SelectOption> geOptions() {
+        List<SelectOption> countryOptions = new List<SelectOption>();
+        countryOptions.add(new SelectOption(None,'-'+None+'-'));
+        countryOptions.add(new SelectOption(Standard, Standard));
+        countryOptions.add(new SelectOption(Custom,Custom));
+        return countryOptions;
+    }
+    
+    public PageReference Next(){
+        
+        if(selectedList==None || selectedList=='' || selectedList==null){
+             ApexPages.addmessage(new ApexPages.message(ApexPages.severity.ERROR,'Please Select AtLeast One Template'));
+        }else{
+            String Id=testId;
+            PageReference pageRef = new PageReference('/apex/QuoteTemplate?Id='+Id+'&selval='+selectedList);
+            pageRef.setRedirect(true);
+            return pageRef;  
+        }
+        return null;  
+       
+    }
+}
