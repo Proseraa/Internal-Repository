@@ -1,0 +1,36 @@
+trigger QuoteLineItemTrigger on Quotes__c (after update){
+    
+    Map<Id,id> quoteIdToOppId =new Map<Id,id>();
+    List<OpportunityLineItem__c> oppLineItems = new List<OpportunityLineItem__c>();
+   
+    for(Quotes__c q : trigger.new){
+        if(q.IsSyncing__c && q.IsSyncing__c!= Trigger.oldMap.get(q.Id).IsSyncing__c){
+            quoteIdToOppId.put(q.id, q.OpportunityId__c);
+        } 
+    }
+    
+    if(!quoteIdToOppId.isEmpty()){
+        List<QuoteLineitem__c> quolilist =[SELECT Id, Product2Id__c,Product2Id__r.name,Quantity__c,ServiceDate__c, 
+                                           QuotesId__c,QuotesId__r.OpportunityId__c,ListPrice__c,Line_Item_Description__c,Total_Price__c,
+                                           Product2Id__r.Product_Code__c,UnitPrice__c  
+                                           FROM QuoteLineitem__c 
+                                           WHERE QuotesId__c =: quoteIdToOppId.keyset() AND QuotesId__r.IsSyncing__c=True];
+        for(QuoteLineitem__c qli :quolilist)  
+        { 
+            OpportunityLineItem__c oli = new OpportunityLineItem__c();
+            oli.OpportunityId__c =  qli.QuotesId__r.OpportunityId__c;
+            oli.Product2Id__c = qli.Product2Id__c; 
+            oli.Quantity__c = qli.Quantity__c; 
+            oli.ListPrice__c = integer.valueof(qli.ListPrice__c); 
+            oli.Description__c = qli.Line_Item_Description__c;
+            oli.ServiceDate__c = qli.ServiceDate__c;
+            oli.Total_Price__c = qli.Total_Price__c;
+            oli.ProductCode__c = qli.Product2Id__r.Product_Code__c;
+            oli.Sales_Price__c = qli.UnitPrice__c;
+            oppLineItems.add(oli);
+        } 
+        if(oppLineItems.size()>0){
+            insert oppLineItems; 
+        }
+    }
+}
