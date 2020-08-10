@@ -1,0 +1,214 @@
+<apex:page standardController="Quotes__c" renderAs="{!renderAs}" extensions="QuoteApexClass" sidebar="false">
+    <apex:form id="form1" rendered="{!showPrintLink}" style="width:700px; margin:auto; float:center;font-family:Times New Roman;font-size: 18px;"> 
+        <Right>
+            <apex:commandButton action="{!print}" value="Save to PDF" style="float:center;color: #0A3FF3; font-size: 17px;right:0px;position:relative;border-radius:1px;"/>
+            <apex:commandButton action="{!saveQuoteAsPDFandEmail}" value="Save and Email" style="float:center;color: #0A3FF3; font-size: 17px;right:-20px;position:relative; border-radius:1px;"/>
+            <apex:commandButton action="{!cancel}" value="Cancel" style="float:center;color: #0A3FF3; font-size: 17px;right:-40px;position:relative; border-radius:1px;"/>
+        </Right>
+        <br/><br/><br/>
+        <apex:outputPanel rendered="{!If(selectedList=='Standard' , true, false)}">
+            <html>
+                <head>
+                    <div style="background-color: #ffe4c4;margin-top: -32px;">
+                        <apex:image url="{!URLFOR($Resource.Proseralogo)}" width="200" height="60" alt="plogo"/><br/><br/>
+                        <b style="font-size: 20px;">{!$Organization.Name}</b>
+                    </div>
+                </head>
+                <body>
+                    <br/> 
+                    <table width="100%"> 
+                        <tr><td style="background-color:#add8e6;" colspan="6">General Information</td></tr>
+                        <tr>
+                            <td width="66%">Company Address: {!$Organization.Country}</td>
+                            <td></td>
+                            <td>Quote Number:{!Quotes__c.Quote_Number__c}</td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td></td>
+                            <td>Expiration Date:<apex:outputField value="{!Quotes__c.Expiration_Date__c}"/></td>
+                        </tr>
+                    </table><br/>
+                    <div style="background-color:#add8e6;">Contact Information </div>
+                    <table>
+                        <tr>
+                            <td>Prepared By:{!Quotes__c.OwnerId__r.Name}</td>
+                        </tr>
+                        <tr>
+                            <td>Email:{!Quotes__c.Email__c}</td>
+                        </tr>
+                    </table><br/>
+                    <div style="background-color:#add8e6;">Address Information</div>
+                    <table>
+                        <tr>
+                            <td>
+                                Bil To:<p style="margin-left: 49px;margin-top: -20px;margin-right: 311px;font-size: 15px;">{!Quotes__c.Bill_To__c}
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Ship To:<p style="margin-left: 65px;margin-top: -19px;margin-right: 311px;font-size: 15px;">{!Quotes__c.ShippingAddress__c}</p></td>
+                        </tr>
+                    </table><br/>
+                    <div style="background-color:#add8e6;">Product Details</div>
+                    <table style=" width:100%;">
+                        <tr border="1" style="background-color: #deb887;"> 
+                            <th style="text-align:center">Product Name</th>
+                            <th style="text-align:center">List Price</th>
+                            <th style="text-align:center">Sales Price</th>
+                            <th style="text-align:center">Quantity</th>
+                            <th style="text-align:center">Total Price</th>  
+                        </tr>
+                        <apex:repeat value="{!Quotes__c.Quote_Line_Items__r}" var="QuoteLine">
+                            <tr style="border: 1px solid #ddd; background-color: #f2f2f2;background-color: #ddd;">
+                                <td style="text-align:center">{!QuoteLine.Product2Id__r.Name}</td>
+                                <td style="text-align:center">{!QuoteLine.ListPrice__c}</td>
+                                <td style="text-align:center">{!QuoteLine.UnitPrice__c}</td>
+                                <td style="text-align:center">{!QuoteLine.Quantity__c}</td>
+                                <td style="text-align:center">{!QuoteLine.Total_Price__c}</td>
+                            </tr>
+                        </apex:repeat>
+                    </table><br/>
+                    <div style="background-color:#add8e6;">Totals</div>
+                    <table>
+                        <tr>
+                            <td>Sub Total:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.SubTotal__c}"/></td>
+                        </tr>
+                        <tr>
+                            <td>Discount:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.Discount__c}"/></td>
+                        </tr>
+                        <tr>
+                            <td>Total Price:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.Total_Price__c}"/></td>
+                        </tr>
+                        <tr>
+                            <td>Tax:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.Tax__c}"/></td>
+                        </tr>
+                        <tr>
+                            <td>Shipping and Handling:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.ShippingHandling__c}"/></td>
+                        </tr>
+                        <tr>
+                            <td>Grand Total:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.Grand_Total__c}"/></td>
+                        </tr>
+                    </table><br/>
+                    <div style="background-color:#add8e6;margin-bottom: 6px;">Quote Acceptance Information</div>
+                    <table>
+                        <tr>
+                            <td style="margin-bottom: 6px;">Signature:........................</td>
+                        </tr>
+                        <tr>
+                            <td style="margin-bottom: 6px;">Name:..............................</td>
+                        </tr>
+                        <tr>
+                            <td style="margin-bottom: 6px;">Title:..............................</td>
+                        </tr>
+                        <tr>
+                            <td style="margin-bottom: 6px;">Date:...............................</td>
+                        </tr>
+                    </table>
+                </body>
+            </html>
+        </apex:outputPanel> 
+        
+        
+        <apex:outputPanel rendered="{!If(selectedList=='Custom' , true, false)}">
+            <html>
+                <head>
+                    <apex:image url="{!URLFOR($Resource.Proseralogo)}" width="200" height="60" alt="plogo"/><br/><br/>
+                    <b style="font-size: 20px;">{!$Organization.Name}</b>
+                </head>
+                <body>
+                    <br/>
+                    <table width="100%"> 
+                        <tr><td colspan="6"><b>General Information</b></td></tr>
+                        <tr>
+                            <td width="66%">Company Address: {!$Organization.Country}</td>
+                            <td></td>
+                            <td>Quote Number:{!Quotes__c.Quote_Number__c}</td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td></td>
+                            <td>Expiration Date:<apex:outputField value="{!Quotes__c.Expiration_Date__c}"/></td>
+                        </tr>
+                    </table><br/>
+                    <div><b>Contact Information</b></div>
+                    <table>
+                        <tr>
+                            <td>Prepared By:{!Quotes__c.OwnerId__r.Name}</td>
+                        </tr>
+                        <tr>
+                            <td>Email:{!Quotes__c.Email__c}</td>
+                        </tr>
+                    </table><br/>
+                    <div><b>Address Information</b></div>
+                    <table>
+                        <tr>
+                            <td>
+                                Bil To:<p style="margin-left: 49px;margin-top: -20px;margin-right: 311px;font-size: 15px;">{!Quotes__c.Bill_To__c}
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Ship To:<p style="margin-left: 65px;margin-top: -19px;margin-right: 311px;font-size: 15px;">{!Quotes__c.ShippingAddress__c}</p></td>
+                        </tr>
+                    </table>
+                    <div><b>Product Details</b></div>
+                    <table style="width:100%;border-collapse: collapse;" border="1">
+                        <tr border="1"> 
+                            <th style="text-align:center">Product Name</th>
+                            <th style="text-align:center">List Price</th>
+                            <th style="text-align:center">Sales Price</th>
+                            <th style="text-align:center">Quantity</th>
+                            <th style="text-align:center">Total Price</th>  
+                        </tr>
+                        <apex:repeat value="{!Quotes__c.Quote_Line_Items__r}" var="QuoteLine">
+                            <tr style="border: 1px solid #ddd;">
+                                <td style="text-align:center">{!QuoteLine.Product2Id__r.Name}</td>
+                                <td style="text-align:center">{!QuoteLine.ListPrice__c}</td>
+                                <td style="text-align:center">{!QuoteLine.UnitPrice__c}</td>
+                                <td style="text-align:center">{!QuoteLine.Quantity__c}</td>
+                                <td style="text-align:center">{!QuoteLine.Total_Price__c}</td>
+                            </tr>
+                        </apex:repeat>
+                    </table><br/>
+                    <div><b>Totals</b></div>
+                    <table>
+                        <tr>
+                            <td>Sub Total:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.SubTotal__c}"/></td>
+                        </tr>
+                        <tr>
+                            <td>Discount:<apex:outputLabel value="{!Quotes__c.Discount__c}"/></td>
+                        </tr>
+                        <tr>
+                            <td>Total Price:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.Total_Price__c}"/></td>
+                        </tr>
+                        <tr>
+                            <td>Tax:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.Tax__c}"/></td>
+                        </tr>
+                        <tr>
+                            <td>Shipping and Handling:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.ShippingHandling__c}"/></td>
+                        </tr>
+                        <tr>
+                            <td>Grand Total:Rs.<apex:outputLabel escape="false" value="{!Quotes__c.Grand_Total__c}"/></td>
+                        </tr>
+                    </table><br/>
+                    <div><b>Quote Acceptance Information</b></div>
+                    <table>
+                        <tr>
+                            <td style="margin-bottom: 6px;">Signature:........................</td>
+                        </tr>
+                        <tr>
+                            <td style="margin-bottom: 6px;">Name:..............................</td>
+                        </tr>
+                        <tr>
+                            <td style="margin-bottom: 6px;">Title:..............................</td>
+                        </tr>
+                        <tr>
+                            <td style="margin-bottom: 6px;">Date:...............................</td>
+                        </tr>
+                    </table>
+                </body>
+            </html>
+        </apex:outputPanel>
+    </apex:form>
+</apex:page>

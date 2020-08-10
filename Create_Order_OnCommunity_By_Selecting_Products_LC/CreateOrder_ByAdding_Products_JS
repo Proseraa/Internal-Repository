@@ -1,0 +1,216 @@
+({
+    doInit: function(component, event, helper) {
+        component.set("v.boolean1", false);
+        component.set("v.boolean2", true);
+       
+        var today = new Date();
+        var monthDigit = today.getMonth() + 1;
+        if (monthDigit <= 9) {
+            monthDigit = '0' + monthDigit;
+        }
+        var dateval = today.getDate();
+         if (dateval <= 9) {
+            dateval = '0' + dateval;
+        }
+        component.set('v.ord.EffectiveDate',today.getFullYear() + "-" + monthDigit + "-" + dateval);
+        var action = component.get("c.getAccountId");
+        action.setParams({
+
+        });
+        action.setCallback(this, function(response) {
+            var state = response.getState();
+            component.set("v.acName", response.getReturnValue().Name);
+            component.set("v.acId", response.getReturnValue().Id);
+        });
+        $A.enqueueAction(action);
+        helper.getStatusPicklist(component, event);
+        helper.getCurrencyPicklist(component, event);
+        component.set("v.boolean", false);
+
+
+
+        var action = component.get("c.listValues");
+        action.setParams({
+            "objectInfo": component.get("v.objectInfo")
+        });
+        action.setCallback(this, function(response) {
+            var state = response.getState();
+            if (state === "SUCCESS") {
+                var listViewResult = response.getReturnValue();
+                if (listViewResult.length > 0) {
+                    // set listViewResult attribute with response
+                    component.set("v.listViewResult", listViewResult);
+                    // set first value as default value
+                    component.set("v.currentListViewName", listViewResult[0].developerName);
+                    // render list view on component
+                    component.set("v.bShowListView", true);
+                }
+            } else if (state === "INCOMPLETE") {} else if (state === "ERROR") {
+                var errors = response.getError();
+                if (errors) {
+                    if (errors[0] && errors[0].message) {
+                        console.log("Error message: " +
+                            errors[0].message);
+                    }
+                } else {
+                    console.log("Unknown error");
+                }
+            }
+        });
+        $A.enqueueAction(action);
+    },
+
+    
+    searchTable: function(cmp, event, helper) {
+        var allRecords = cmp.get("v.data");
+        var searchFilter = event.getSource().get("v.value").toUpperCase();
+        var tempArray = [];
+        var i;
+        for (i = 0; i < allRecords.length; i++) {
+            if ((allRecords[i].Product2.Name && allRecords[i].Product2.Name.toUpperCase().indexOf(searchFilter) != -1)) {
+                tempArray.push(allRecords[i]);
+            }
+        }
+        cmp.set("v.filteredData", tempArray);
+    },
+    handleSelect: function(component, event, helper) {
+        var selectedRows = event.getParam('selectedRows');
+        var setRows = [];
+        for (var i = 0; i < selectedRows.length; i++) {
+            setRows.push(selectedRows[i]);
+        }
+        component.set("v.selectedproducts", setRows);
+
+    },
+    CreateNewOrder: function(component, event, helper) {
+        component.set("v.boolean1", true);
+        component.set("v.boolean2", false);
+    },
+
+    NextButton: function(component, event, helper) {
+        var action = component.get("c.getorderItemProducts");
+        var selectedprod = component.get("v.selectedproducts");
+        action.setParams({
+            selproductList: selectedprod
+        });
+        action.setCallback(this, function(response) {
+            var state = response.getState();
+            var toastEvent = $A.get("e.force:showToast");
+            if (state === "SUCCESS") {
+                if (selectedprod.length == 0) {
+                    toastEvent.setParams({
+                        title: 'Error',
+                        message: "Please Select Atleast One Product",
+                        duration: ' 5000',
+                        key: 'info_alt',
+                        type: 'error',
+                        mode: 'pester'
+                    });
+                } else {
+                    component.set("v.showEditmode", "true");
+                    component.set("v.OrderItemListWrapper", response.getReturnValue());
+                    component.set("v.boolean1", false);
+                    component.set("v.boolean", true);
+                    component.set("v.boolean3", true);
+                    component.set("v.boolean4", false);
+                }
+            }
+            toastEvent.fire();
+        });
+        $A.enqueueAction(action);
+    },
+
+    handleCheckOrderandSave: function(component, event, helper) {
+        helper.saveOrder(component, event);
+        component.set('v.columns', [{
+                label: 'Product Name',
+                fieldName: 'ProductName',
+                type: 'text'
+            },
+            {
+                label: 'Product Code',
+                fieldName: 'ProductCode',
+                type: 'text'
+            },
+            {
+                label: 'List Price',
+                fieldName: 'UnitPrice',
+                type: 'currency'
+            },
+            {
+                label: 'Product Family',
+                fieldName: 'ProductFamily',
+                type: 'text'
+            },
+            {
+                label: 'Productcurrency',
+                fieldName: 'CurrencyIsoCode',
+                type: 'text'
+            },
+        ]);
+
+        var action = component.get("c.getListOfProducts");
+        action.setCallback(this, function(response) {
+            var state = response.getState();
+            if (state === "SUCCESS") {
+                var rows = response.getReturnValue();
+                for (var i = 0; i < rows.length; i++) {
+                    var row = rows[i];
+                    if (row.Product2.Name) row.ProductName = row.Product2.Name;
+                    if (row.Product2.Family) row.ProductFamily = row.Product2.Family;
+                    if (row.Product2.CurrencyIsoCode) row.Productcurrency = row.Product2.CurrencyIsoCode;
+                }
+                component.set("v.data", rows);
+                component.set("v.filteredData", rows);
+            }
+        });
+
+        $A.enqueueAction(action);
+    },
+    handleOrderitemSave: function(component, event, helper) {
+        helper.saveOrderitem(component, event);
+        component.set("v.selectedproducts", []);
+    },
+
+
+    cancelButton: function(component, event, helper) {
+        component.set("v.boolean2", true);
+        component.set("v.boolean", false);
+        component.set("v.boolean1", false);
+        component.set("v.OrderItemListWrapper", []);
+        component.set("v.selectedproducts", []);
+        var getorder = component.get("v.orderid");
+        var action = component.get("c.deleteorder");
+        action.setParams({
+            orderid: getorder,
+        });
+        action.setCallback(this, function(response) {
+            var state = response.getState();
+            if (state === "SUCCESS") {
+                var rows = response.getReturnValue();
+
+            }
+        });
+        $A.enqueueAction(action);
+    },
+    onPicklistChange: function(component, event, helper) {
+        // unrenders listView 
+        component.set("v.bShowListView", false);
+        // get current selected listview Name 
+        var lstViewName = event.getSource().get("v.value");
+        // set new listName for listView
+        component.set("v.currentListViewName", lstViewName);
+        // rendere list view again with new listNew  
+        component.set("v.bShowListView", true);
+    },
+    backbutton: function(component, event, helper){
+        component.set("v.OrderItemListWrapper", []);
+        component.set("v.selectedproducts", []);
+        component.set("v.boolean2", false);
+        component.set("v.boolean1", false);
+        component.set("v.boolean", true);
+        component.set("v.boolean3", false);
+        component.set("v.boolean4", true);
+   },    
+   
+})

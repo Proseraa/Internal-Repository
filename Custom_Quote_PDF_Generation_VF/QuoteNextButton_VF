@@ -1,0 +1,13 @@
+<apex:page standardController="Quotes__c" extensions="QuoteApexClass" lightningStylesheets="True" docType="html-5.0">
+    <apex:form >
+        <apex:pageMessages />
+        <apex:pageBlock title="select The Template">
+            <apex:selectList value="{!selectedList}" multiselect="false" size="1" style="width:100px">
+                <apex:selectOption itemValue="None" itemLabel="None"/>
+                <apex:selectOption itemValue="Standard" itemLabel="Standard"/>
+                <apex:selectOption itemValue="Custom" itemLabel="Custom"/>
+            </apex:selectList>
+            <apex:commandButton value="Next" action="{!Next}" style="background-color:lightgreen;"/>  
+        </apex:pageBlock>
+    </apex:form>
+</apex:page>
